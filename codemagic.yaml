@@ -1,49 +1,33 @@
 workflows:
-  android-workflow:
+  shofyou-android-build:
     name: Shofyou Android Build
-    max_build_duration: 60
+    max_build_duration: 30
 
     environment:
       groups:
         - keystore_credentials
-
-      vars:
-        PACKAGE_NAME: "com.shofyou.android"
-
       java: 17
 
     scripts:
       - name: Decode Keystore
         script: |
-          echo "Generating keystore..."
-          keytool -genkey -v \
-            -keystore release.keystore \
-            -alias $CM_KEY_ALIAS \
-            -keyalg RSA \
-            -keysize 2048 \
-            -validity 10000 \
-            -storepass $CM_KEYSTORE_PASSWORD \
-            -keypass $CM_KEY_PASSWORD \
-            -dname "CN=Shofyou, OU=Mobile, O=Shofyou, L=City, S=State, C=MA"
+          echo $CM_KEYSTORE | base64 --decode > shofyou.keystore
 
-      - name: Set up signing config
+      - name: Create signing properties
         script: |
-          cat > android_signing.properties <<EOF
-          storeFile=release.keystore
-          storePassword=$CM_KEYSTORE_PASSWORD
-          keyAlias=$CM_KEY_ALIAS
-          keyPassword=$CM_KEY_PASSWORD
-          EOF
+          echo "storeFile=shofyou.keystore" > android_signing.properties
+          echo "storePassword=$CM_KEYSTORE_PASSWORD" >> android_signing.properties
+          echo "keyAlias=$CM_KEY_ALIAS" >> android_signing.properties
+          echo "keyPassword=$CM_KEY_PASSWORD" >> android_signing.properties
 
       - name: Build APK
         script: |
-          ./gradlew assembleRelease
+          gradle assembleRelease
 
       - name: Build AAB
         script: |
-          ./gradlew bundleRelease
+          gradle bundleRelease
 
     artifacts:
       - app/build/outputs/**/*.apk
       - app/build/outputs/**/*.aab
-      - release.keystore
