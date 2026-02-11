@@ -11,11 +11,11 @@ workflows:
     scripts:
       - name: Decode Keystore
         script: |
-          echo $CM_KEYSTORE | base64 --decode > shofyou.keystore
+          echo $CM_KEYSTORE | base64 --decode > app/shofyou.keystore
 
       - name: Create signing properties
         script: |
-          echo "storeFile=shofyou.keystore" > android_signing.properties
+          echo "storeFile=app/shofyou.keystore" > android_signing.properties
           echo "storePassword=$CM_KEYSTORE_PASSWORD" >> android_signing.properties
           echo "keyAlias=$CM_KEY_ALIAS" >> android_signing.properties
           echo "keyPassword=$CM_KEY_PASSWORD" >> android_signing.properties
