@@ -1,30 +1,25 @@
 package com.shofyou.android
 
 import android.annotation.SuppressLint
-import android.app.Dialog
 import android.content.Intent
+import android.graphics.Bitmap
 import android.net.ConnectivityManager
-import android.net.Uri
+import android.net.NetworkCapabilities
+import android.os.Build
 import android.os.Bundle
-import android.view.View
 import android.webkit.*
-import android.widget.FrameLayout
 import androidx.appcompat.app.AppCompatActivity
-import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var webView: WebView
-    private lateinit var swipeRefresh: SwipeRefreshLayout
-    private var filePathCallback: ValueCallback<Array<Uri>>? = null
-    private var customView: View? = null
-    private var customViewCallback: WebChromeClient.CustomViewCallback? = null
+    private val websiteUrl = "https://shofyou.com" // ضع رابط موقعك هنا
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        if (!isConnected()) {
+        if (!isInternetAvailable()) {
             startActivity(Intent(this, NoInternetActivity::class.java))
             finish()
             return
@@ -32,84 +27,97 @@ class MainActivity : AppCompatActivity() {
 
         setContentView(R.layout.activity_main)
 
-        webView = findViewById(R.id.webview)
-        swipeRefresh = findViewById(R.id.swipeRefresh)
+        webView = findViewById(R.id.webView)
 
-        CookieManager.getInstance().setAcceptCookie(true)
+        webView.settings.javaScriptEnabled = true
+        webView.settings.domStorageEnabled = true
+        webView.settings.loadWithOverviewMode = true
+        webView.settings.useWideViewPort = true
+        webView.settings.mediaPlaybackRequiresUserGesture = false
+        webView.settings.allowFileAccess = true
+        webView.settings.allowContentAccess = true
 
-        webView.settings.apply {
-            javaScriptEnabled = true
-            domStorageEnabled = true
-            allowFileAccess = true
-            mediaPlaybackRequiresUserGesture = false
-            databaseEnabled = true
+        webView.webChromeClient = object : WebChromeClient() {
+
+            // دعم رفع الصور مثل فيسبوك
+            override fun onShowFileChooser(
+                webView: WebView?,
+                filePathCallback: ValueCallback<Array<android.net.Uri>>?,
+                fileChooserParams: FileChooserParams?
+            ): Boolean {
+
+                val intent = fileChooserParams?.createIntent()
+
+                if (intent != null) {
+                    try {
+                        startActivityForResult(intent, 100)
+                    } catch (e: Exception) {
+                        return false
+                    }
+                }
+
+                return true
+            }
         }
 
         webView.webViewClient = object : WebViewClient() {
 
-            override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
-                val url = request?.url.toString()
-                showPopup(url)
-                return true
-            }
-
-            override fun onPageFinished(view: WebView?, url: String?) {
-                swipeRefresh.isRefreshing = false
-
-                // تعطيل السحب فقط في صفحة الريلز
-                if (url != null && url.contains("reels")) {
-                    swipeRefresh.isEnabled = false
-                } else {
-                    swipeRefresh.isEnabled = true
-                }
-            }
-        }
-
-        webView.webChromeClient = object : WebChromeClient() {
-
-            override fun onShowFileChooser(
-                webView: WebView?,
-                filePathCallback: ValueCallback<Array<Uri>>?,
-                fileChooserParams: FileChooserParams?
+            override fun shouldOverrideUrlLoading(
+                view: WebView?,
+                request: WebResourceRequest?
             ): Boolean {
-                this@MainActivity.filePathCallback = filePathCallback
-                startActivityForResult(fileChooserParams?.createIntent(), 100)
+
+                val url = request?.url.toString()
+
+                // فتح الروابط الخارجية داخل التطبيق
+                view?.loadUrl(url)
                 return true
             }
 
-            override fun onShowCustomView(view: View?, callback: CustomViewCallback?) {
-                customView = view
-                customViewCallback = callback
-                setContentView(view)
+            override fun onPageStarted(
+                view: WebView?,
+                url: String?,
+                favicon: Bitmap?
+            ) {
+                super.onPageStarted(view, url, favicon)
             }
 
-            override fun onHideCustomView() {
-                customView = null
-                customViewCallback?.onCustomViewHidden()
-                setContentView(R.layout.activity_main)
+            override fun onReceivedError(
+                view: WebView?,
+                request: WebResourceRequest?,
+                error: WebResourceError?
+            ) {
+                startActivity(Intent(this@MainActivity, NoInternetActivity::class.java))
+                finish()
             }
         }
 
-        swipeRefresh.setOnRefreshListener {
-            webView.reload()
+        webView.loadUrl(websiteUrl)
+    }
+
+    // دعم زر الرجوع
+    override fun onBackPressed() {
+        if (webView.canGoBack()) {
+            webView.goBack()
+        } else {
+            super.onBackPressed()
         }
-
-        webView.loadUrl("https://shofyou.com")
     }
 
-    private fun showPopup(url: String) {
-        val dialog = Dialog(this)
-        val popupWebView = WebView(this)
+    // فحص الاتصال بالإنترنت
+    private fun isInternetAvailable(): Boolean {
+        val connectivityManager =
+            getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
 
-        popupWebView.settings.javaScriptEnabled = true
-        popupWebView.loadUrl(url)
-
-        dialog.setContentView(popupWebView)
-        dialog.show()
-    }
-
-    private fun isConnected(): Boolean {
-        val cm = getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
-        return cm.activeNetworkInfo?.isConnected == true
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val network = connectivityManager.activeNetwork ?: return false
+            val capabilities =
+                connectivityManager.getNetworkCapabilities(network) ?: return false
+            return capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
+                    || capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)
+        } else {
+            val networkInfo = connectivityManager.activeNetworkInfo
+            return networkInfo != null && networkInfo.isConnected
+        }
     }
 }
