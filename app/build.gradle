@@ -1,49 +1,74 @@
-workflows:
-  android-workflow:
-    name: Shofyou Android Build
-    max_build_duration: 60
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+}
 
-    environment:
-      groups:
-        - keystore_credentials
+import java.util.Properties
+import java.io.FileInputStream
 
-      vars:
-        PACKAGE_NAME: "com.shofyou.android"
+def keystorePropertiesFile = rootProject.file("android_signing.properties")
+def keystoreProperties = new Properties()
 
-      java: 17
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
 
-    scripts:
-      - name: Decode Keystore
-        script: |
-          echo "Generating keystore..."
-          keytool -genkey -v \
-            -keystore release.keystore \
-            -alias $CM_KEY_ALIAS \
-            -keyalg RSA \
-            -keysize 2048 \
-            -validity 10000 \
-            -storepass $CM_KEYSTORE_PASSWORD \
-            -keypass $CM_KEY_PASSWORD \
-            -dname "CN=Shofyou, OU=Mobile, O=Shofyou, L=City, S=State, C=MA"
+android {
+    namespace "com.shofyou.android"
+    compileSdk 34
 
-      - name: Set up signing config
-        script: |
-          cat > android_signing.properties <<EOF
-          storeFile=release.keystore
-          storePassword=$CM_KEYSTORE_PASSWORD
-          keyAlias=$CM_KEY_ALIAS
-          keyPassword=$CM_KEY_PASSWORD
-          EOF
+    defaultConfig {
+        applicationId "com.shofyou.android"
+        minSdk 23
+        targetSdk 34
+        versionCode 1
+        versionName "1.0"
+        multiDexEnabled true
+    }
 
-      - name: Build APK
-        script: |
-          ./gradlew assembleRelease
+    signingConfigs {
+        release {
+            if (keystorePropertiesFile.exists()) {
+                storeFile file(keystoreProperties['storeFile'])
+                storePassword keystoreProperties['storePassword']
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+            }
+        }
+    }
 
-      - name: Build AAB
-        script: |
-          ./gradlew bundleRelease
+    buildTypes {
+        release {
+            signingConfig signingConfigs.release
+            minifyEnabled false
+            shrinkResources false
+            debuggable false
+        }
 
-    artifacts:
-      - app/build/outputs/**/*.apk
-      - app/build/outputs/**/*.aab
-      - release.keystore
+        debug {
+            debuggable true
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = '17'
+    }
+
+    buildFeatures {
+        viewBinding true
+    }
+}
+
+dependencies {
+    implementation 'androidx.core:core-ktx:1.12.0'
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'com.google.android.material:material:1.11.0'
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+    implementation 'androidx.swiperefreshlayout:swiperefreshlayout:1.1.0'
+    implementation 'androidx.multidex:multidex:2.0.1'
+}
