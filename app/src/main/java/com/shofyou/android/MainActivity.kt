@@ -9,11 +9,12 @@ import android.os.Build
 import android.os.Bundle
 import android.webkit.*
 import androidx.appcompat.app.AppCompatActivity
+import com.shofyou.android.databinding.ActivityMainBinding
 
 class MainActivity : AppCompatActivity() {
 
-    private lateinit var webView: WebView
-    private val websiteUrl = "https://shofyou.com" // ضع رابط موقعك هنا
+    private lateinit var binding: ActivityMainBinding
+    private val websiteUrl = "https://shofyou.com"
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -25,9 +26,10 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        setContentView(R.layout.activity_main)
+        binding = ActivityMainBinding.inflate(layoutInflater)
+        setContentView(binding.root)
 
-        webView = findViewById(R.id.webView)
+        val webView = binding.webView
 
         webView.settings.javaScriptEnabled = true
         webView.settings.domStorageEnabled = true
@@ -38,8 +40,6 @@ class MainActivity : AppCompatActivity() {
         webView.settings.allowContentAccess = true
 
         webView.webChromeClient = object : WebChromeClient() {
-
-            // دعم رفع الصور مثل فيسبوك
             override fun onShowFileChooser(
                 webView: WebView?,
                 filePathCallback: ValueCallback<Array<android.net.Uri>>?,
@@ -47,15 +47,9 @@ class MainActivity : AppCompatActivity() {
             ): Boolean {
 
                 val intent = fileChooserParams?.createIntent()
-
                 if (intent != null) {
-                    try {
-                        startActivityForResult(intent, 100)
-                    } catch (e: Exception) {
-                        return false
-                    }
+                    startActivityForResult(intent, 100)
                 }
-
                 return true
             }
         }
@@ -66,20 +60,8 @@ class MainActivity : AppCompatActivity() {
                 view: WebView?,
                 request: WebResourceRequest?
             ): Boolean {
-
-                val url = request?.url.toString()
-
-                // فتح الروابط الخارجية داخل التطبيق
-                view?.loadUrl(url)
+                view?.loadUrl(request?.url.toString())
                 return true
-            }
-
-            override fun onPageStarted(
-                view: WebView?,
-                url: String?,
-                favicon: Bitmap?
-            ) {
-                super.onPageStarted(view, url, favicon)
             }
 
             override fun onReceivedError(
@@ -95,16 +77,14 @@ class MainActivity : AppCompatActivity() {
         webView.loadUrl(websiteUrl)
     }
 
-    // دعم زر الرجوع
     override fun onBackPressed() {
-        if (webView.canGoBack()) {
-            webView.goBack()
+        if (binding.webView.canGoBack()) {
+            binding.webView.goBack()
         } else {
             super.onBackPressed()
         }
     }
 
-    // فحص الاتصال بالإنترنت
     private fun isInternetAvailable(): Boolean {
         val connectivityManager =
             getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
